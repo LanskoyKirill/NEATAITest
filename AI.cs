@@ -4,12 +4,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using System.Linq;
-using Unity.VisualScripting.Dependencies.Sqlite;
-using System.Reflection.Emit;
-using Unity.VisualScripting;
 using System.Data;
 using UnityEditor;
-using UnityEditor.Rendering;
+
 public class AI : MonoBehaviour
 {
     public GameObject gm;
@@ -17,7 +14,6 @@ public class AI : MonoBehaviour
 
     //[NonSerialized] 
     public int addition = 0;
-    public int Conn = 0;
 
     //NEAT inizialization
     public float speed = 0.01f;
@@ -78,20 +74,13 @@ public class AI : MonoBehaviour
         }
         //Thinking
         string str = "";
-        float abc1 = 0;
-        float abc = 0;
-        float abc2 = 0;
         for(int i = 0; i < order.Count; i++){
-            int a = order[i];
-            if(a > 4){
-                neurones[a] = (float)System.Math.Tanh(neurones[a]);
+            int thisNeuron = order[i];
+            if(thisNeuron > 4){
+                neurones[thisNeuron] = (float)System.Math.Tanh(neurones[thisNeuron]);
             }
-            foreach(KeyValuePair<int, float> b in adjList[a]){
-                abc = neurones[a];
-                abc1 = neurones[b.Key];
-                abc2 = b.Value;
-                float ab = b.Value * neurones[a];
-                neurones[b.Key] += b.Value * neurones[a];
+            foreach(var b in adjList[thisNeuron]){
+                neurones[b.Key] += b.Value * neurones[thisNeuron];
             }
         }
         foreach(float a in neurones){
@@ -176,14 +165,9 @@ public class AI : MonoBehaviour
                     ++reccurency;
                     break;
                 }
-                else{
-                    reccurency = 0;
-                }
             }
-            if(reccurency > 0){
-                probableOut = UnityEngine.Random.Range(4, outInnov.Count);
-                //continue;
-            }
+            
+            probableOut = UnityEngine.Random.Range(4, outInnov.Count);
             if(reccurency > 9){
                 reccurency = 1;
                 break;
@@ -195,7 +179,7 @@ public class AI : MonoBehaviour
         outInnov.Add(probableOut);
         RNNs.Add(false);
         actConnect.Add(true);
-        if(GenToPh()[0] == 4 || reccurency == 1){
+        if(GenToPh()[0] == 4 || reccurency == 1 || GenToPh().Last() != 4){
             //UnityEngine.Random.Range(0, 10) < 3
             //transform.position = new Vector3(transform.position.x, transform.position.y, -1500);
             //Debug.Log(RNNs.Count + " RNNs");
@@ -206,7 +190,7 @@ public class AI : MonoBehaviour
             }
             else{
                 //Debug.Log(inpInnov.Count - 1);
-                inpInnov.RemoveAt(0);
+                inpInnov.RemoveAt(inpInnov.Count - 1);
                 outInnov.RemoveAt(outInnov.Count - 1);
                 RNNs.RemoveAt(RNNs.Count - 1);
                 actConnect.RemoveAt(actConnect.Count - 1);
@@ -224,11 +208,11 @@ public class AI : MonoBehaviour
     }
     //Transforming genotype to phenotype and convenient format
     public List<int> GenToPh(){
-        var _weights = weights;
-        var _inpInnov = inpInnov;
-        var _outInnov = outInnov;
-        var _actConnect = actConnect;
-        var _RNNs = RNNs;
+        List<float> _weights = new List<float>(weights);
+        List<int> _inpInnov = new List<int>(inpInnov);
+        List<int> _outInnov = new List<int>(outInnov);
+        List<bool> _actConnect = new List<bool>(actConnect);
+        List<bool> _RNNs = new List<bool>(RNNs);
         List<int> nullConn = new List<int>();
         List<int> inDegree = new List<int>();
         List<int> order1 = new List<int>();
@@ -255,7 +239,7 @@ public class AI : MonoBehaviour
                 --i;
             }
         }
-        adjList = new List<Dictionary<int, float>>();
+        adjList.Clear();
         for(int i = 0; i < neurones.Count; i++){
            adjList.Add(new Dictionary<int, float>());
         }
@@ -270,7 +254,12 @@ public class AI : MonoBehaviour
         }
         for(int i = 0; i < adjList.Count; i++){
             foreach(KeyValuePair<int, float> b in adjList[i]){
-                ++inDegree[b.Key];
+                try{
+                    ++inDegree[b.Key];
+                }
+                catch{
+                    Debug.Log(inDegree.Count + "   " + b.Key);
+                }
             }
         }
         for(int i = 0; i < inDegree.Count; i++){
@@ -295,8 +284,7 @@ public class AI : MonoBehaviour
         //Debug.Log(str1);
         if(order1.Count != neurones.Count){
             //Debug.Log("Smaller: " + order1.Count + " " + neurones.Count);
-            order1 = new List<int>{4};
-            order1[0] = 4;
+            order1 = new List<int>{4, 0};
             return order1;
         }
         else{
