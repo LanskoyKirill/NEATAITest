@@ -1,329 +1,158 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Threading.Tasks;
+using System.Security.Cryptography;
 using UnityEngine;
 using System.Linq;
+using System;
 using System.Data;
 using UnityEditor;
-
-public class AI : MonoBehaviour
+using Random = UnityEngine.Random;
+public class GameManager : MonoBehaviour
 {
-    public GameObject gm;
-    bool go = true;
-
+    // Start is called before the first frame update
+    public GameObject nn;
+    public List<GameObject> AIs = new List<GameObject>();
+    public float stopwatch = 0f;
     //[NonSerialized] 
-    public int addition = 0;
+    public List<int> oInn = new List<int>();
+    public List<int> iInn = new List<int>();
+    public List<bool> RNN = new List<bool>();
 
-    //NEAT inizialization
-    public float speed = 0.01f;
 
-    public List<float> neurones = new List<float> {1, 0, 0, 0, 0};
-    public List<int> inpInnov = new List<int>();
-    public List<int> outInnov = new List<int>();
-    public List<float> weights =  new List<float>();
-    public List<bool> actConnect = new List<bool>();
-    public List<bool> RNNs = new List<bool>();
-    public List<float> RNNneurones = new List<float> {1, 0, 0, 0, 0};
-    public List<int> order = new List<int>();
-    public List<Dictionary<int, float>> adjList = new List<Dictionary<int, float>>();
-    public List<int> innovations = new List<int>();
-
-    public int layer = 0;
-
-    Rigidbody rb;
+    public int population = 100;
     void Start()
     {
-        rb = GetComponent<Rigidbody>();
-        layer = 0;
-        //addition = 2;
-        Adder();
+        //creating population
+        for(int i = 0; i < population; i++){
+            float b = transform.position.x * Random.Range(0.9f, 1.1f);
+            GameObject a = Instantiate(nn, new Vector3(b, transform.position.y, transform.position.z), Quaternion.identity);
+            a.GetComponent<AI>().gm = gameObject;
+            a.GetComponent<AI>().addition = 1;
+            //a.GetComponent<AI>().Conn = 10;
+            AIs.Add(a);
+        }
+        //AIs[0].GetComponent<AI>().Conn = 1;
+        //Time.timeScale = 5;
     }
+
+    // Update is called once per frame
     void Update()
     {
-        //get inputs
-        if(go){
-            //neurones[4] = 0;
-            neurones[0] = 1;
-            rb.MovePosition(rb.position + transform.forward * speed);
-            RaycastHit hit;
-            Ray ray = new Ray(transform.position, new Vector3(-3, 0, 10));
-            Physics.Raycast(ray, out hit);
-            if(hit.collider != null){
-                if(hit.collider.gameObject.tag == "Finish"){
-                    neurones[1] = hit.distance;
-                }
+        if(stopwatch < 1){
+            AIs.Clear();
+            AIs.AddRange(GameObject.FindGameObjectsWithTag("Player"));
+        }
+        stopwatch += Time.deltaTime;
+        if(stopwatch >= 8){
+            stopwatch = 0.1f;
+            List<GameObject> copyAI = new List<GameObject>();
+            foreach(GameObject a in AIs){
+                copyAI.Add(a);
             }
-            Debug.DrawLine(ray.origin, hit.point, Color.red);
-            ray = new Ray(transform.position, new Vector3(0, 0, 1));
-            Physics.Raycast(ray, out hit);
-            if(hit.collider != null){
-                if(hit.collider.gameObject.tag == "Finish"){
-                    neurones[2] = hit.distance;
-                }
+            List<GameObject> SortedList = new List<GameObject>(AIs.OrderByDescending(o=>o.GetComponent<AI>().layer + (o.transform.position.z * 0.0001)).ToList());
+            Debug.Log(AIs.Count);
+            Debug.Log(copyAI.Count);
+            AIs.Clear();
+            Debug.Log(copyAI.Count);
+            List<GameObject> NewAIs = new List<GameObject>(SortedList.GetRange(0, 6));
+            foreach(var a in NewAIs){
+                float c = transform.position.x * Random.Range(0.9f, 1.1f);
+                var b = Instantiate(a, new Vector3(c, transform.position.y, transform.position.z), Quaternion.identity);
+                b.name = "nn";
             }
-            Debug.DrawLine(ray.origin, hit.point, Color.red);
-            ray = new Ray(transform.position, new Vector3(3, 0, 10));
-            Physics.Raycast(ray, out hit);
-            if(hit.collider != null){
-                if(hit.collider.gameObject.tag == "Finish"){
-                    neurones[3] = hit.distance;
-                }
-            }
-            Debug.DrawLine(ray.origin, hit.point, Color.red);
-        }
-        //Thinking
-        string str = "";
-        for(int i = 0; i < order.Count; i++){
-            int thisNeuron = order[i];
-            if(thisNeuron > 4){
-                neurones[thisNeuron] = (float)System.Math.Tanh(neurones[thisNeuron]);
-            }
-            foreach(var b in adjList[thisNeuron]){
-                neurones[b.Key] += b.Value * neurones[thisNeuron];
-            }
-        }
-        foreach(float a in neurones){
-            str += a + " ";
-        }
-        /*if(Conn == 1){
-            Debug.Log(str);
-            Debug.Log(abc1);
-            Debug.Log(abc);
-            Debug.Log(abc2);
-            Debug.Log(neurones[1] + " "+ neurones[2] + " "+ neurones[4]);
-        }*/
-        if(neurones[4] < -0.5f)
-        {
-            gameObject.transform.Rotate(0, -1, 0);
-        }
-        if(neurones[4] >= 0.5f)
-        {
-            gameObject.transform.Rotate(0, 1, 0);
-        }
-        else
-        {
-            gameObject.transform.Rotate(0, 0, 0);
-        }
-        //neurones[4] = 0;
-        for(int i = 0; i < order.Count; i++){
-            neurones[i] = RNNneurones[i];
-        }
-    }
-    private void OnTriggerEnter(Collider other){
-        if(other.gameObject.tag == "Finish"){
-            go = false;
-        }
-        if(other.gameObject.tag == "EditorOnly"){
-            ++layer;
-            Debug.Log("Collision!");
-        }
-    }
-    public void AddNode(){
-        int ind = UnityEngine.Random.Range(0, outInnov.Count);
-        while(true){
-            if(RNNs[ind] == false){
-                break;
-            }
-            ind = UnityEngine.Random.Range(0, outInnov.Count);
-        }
-        neurones.Add(0);
-        adjList.Add(new Dictionary<int, float>());
-
-        actConnect[ind] = false;
-
-        weights.Add(weights[ind]);
-        inpInnov.Add(inpInnov[ind]);
-        outInnov.Add(neurones.Count - 1);
-        RNNs.Add(false);
-        actConnect.Add(true);
-        RNNneurones.Add(0);
-        innovations.Add(gm.GetComponent<GameManager>().DealInnovations(inpInnov[inpInnov.Count - 1], outInnov[inpInnov.Count - 1], RNNs[inpInnov.Count - 1]));
-
-        weights.Add(1f);
-        inpInnov.Add(neurones.Count - 1);
-        outInnov.Add(outInnov[ind]);
-        RNNs.Add(false);
-        actConnect.Add(true);
-        innovations.Add(gm.GetComponent<GameManager>().DealInnovations(inpInnov[inpInnov.Count - 1], outInnov[inpInnov.Count - 1], RNNs[inpInnov.Count - 1]));
-    }
-    public void AddLink(){
-        int reccurency = 0;
-        weights.Add(UnityEngine.Random.Range(-3f, 3f));
-        //UnityEngine.Random.InitState((int)DateTime.Now.Ticks);
-        inpInnov.Add(UnityEngine.Random.Range(1, neurones.Count));
-        int probableOut = UnityEngine.Random.Range(4, neurones.Count);
-        List<int> TakenConnections = new List<int>();
-        for(int i = 0; i < outInnov.Count - 1; i++){
-            if(inpInnov[i] == inpInnov[inpInnov.Count - 1]){
-                TakenConnections.Add(outInnov[i]);
-            }
-        }
-        while(true){
-            foreach(var a in TakenConnections){
-                if(a == probableOut || probableOut == inpInnov[inpInnov.Count - 1]){
-                    ++reccurency;
-                    break;
-                }
-            }
-            
-            probableOut = UnityEngine.Random.Range(4, outInnov.Count);
-            if(reccurency > 9){
-                reccurency = 1;
-                break;
-            }
-            else{
-                break;
-            }
-        }
-        outInnov.Add(probableOut);
-        RNNs.Add(false);
-        actConnect.Add(true);
-        if(GenToPh()[0] == 4 || reccurency == 1 || GenToPh().Last() != 4){
-            //UnityEngine.Random.Range(0, 10) < 3
-            //transform.position = new Vector3(transform.position.x, transform.position.y, -1500);
-            //Debug.Log(RNNs.Count + " RNNs");
-            if(UnityEngine.Random.Range(0, 6) == -1 && reccurency == 0){
-                if (RNNs.Count > 0){
-                    RNNs[this.RNNs.Count - 1] = true;
-                }
-            }
-            else{
-                //Debug.Log(inpInnov.Count - 1);
-                inpInnov.RemoveAt(inpInnov.Count - 1);
-                outInnov.RemoveAt(outInnov.Count - 1);
-                RNNs.RemoveAt(RNNs.Count - 1);
-                actConnect.RemoveAt(actConnect.Count - 1);
-                weights.RemoveAt(weights.Count - 1);
-                //Destroy(gameObject);
-                makeOrder();
-                AddLink();
-            }
-        }
-        else{
-            innovations.Add(gm.GetComponent<GameManager>().DealInnovations(inpInnov[inpInnov.Count - 1], outInnov[inpInnov.Count - 1], RNNs[inpInnov.Count - 1]));
-        }
-        //Debug.Log("4 " + weights[inpInnov.Count - 1]);
-        makeOrder();
-    }
-    //Transforming genotype to phenotype and convenient format
-    public List<int> GenToPh(){
-        List<float> _weights = new List<float>(weights);
-        List<int> _inpInnov = new List<int>(inpInnov);
-        List<int> _outInnov = new List<int>(outInnov);
-        List<bool> _actConnect = new List<bool>(actConnect);
-        List<bool> _RNNs = new List<bool>(RNNs);
-        List<int> nullConn = new List<int>();
-        List<int> inDegree = new List<int>();
-        List<int> order1 = new List<int>();
-        for(int i = 0; i < neurones.Count; i++){
-            inDegree.Add(0);
-        }
-        for(int i = 0; i < _actConnect.Count; i++){
-            if(_actConnect[i] == false){
-                _actConnect.RemoveAt(i);
-                _weights.RemoveAt(i);
-                _inpInnov.RemoveAt(i);
-                _outInnov.RemoveAt(i);
-                _RNNs.RemoveAt(i);
-                --i;
-            }
-        }
-        for(int i = 0; i < _RNNs.Count; i++){
-            if(_RNNs[i] == true){
-                _actConnect.RemoveAt(i);
-                _weights.RemoveAt(i);
-                _inpInnov.RemoveAt(i);
-                _outInnov.RemoveAt(i);
-                _RNNs.RemoveAt(i);
-                --i;
-            }
-        }
-        adjList.Clear();
-        for(int i = 0; i < neurones.Count; i++){
-           adjList.Add(new Dictionary<int, float>());
-        }
-        try{
-            for(int i = 0; i < _inpInnov.Count; i++){
-                adjList[inpInnov[i]].Add(outInnov[i], weights[i]);
-            }
-        }
-        catch{
-            order1 = new List<int>{4};
-            return order1;
-        }
-        for(int i = 0; i < adjList.Count; i++){
-            foreach(KeyValuePair<int, float> b in adjList[i]){
-                try{
-                    ++inDegree[b.Key];
-                }
-                catch{
-                    Debug.Log(inDegree.Count + "   " + b.Key);
-                }
-            }
-        }
-        for(int i = 0; i < inDegree.Count; i++){
-            if(inDegree[i] == 0){
-                nullConn.Add(i);
-            }
-        }
-        string str1 = "";
-        for(int i = 0; i < nullConn.Count; i++){
-            int ie = nullConn[i];
-            order1.Add(ie);
-            foreach(KeyValuePair<int, float> b in adjList[ie]){
-                int a = b.Key;
-                --inDegree[a];
-                if(inDegree[a] == 0){
-                    nullConn.Add(b.Key);
-                }
-                str1 += inDegree[a];
-                str1 += " ";
-            }
-        }
-        //Debug.Log(str1);
-        if(order1.Count != neurones.Count){
-            //Debug.Log("Smaller: " + order1.Count + " " + neurones.Count);
-            order1 = new List<int>{4, 0};
-            return order1;
-        }
-        else{
-            //Debug.Log("normal");
-        }
-        if(!order1.Any()){
-            List<int> a = new List<int>
+            //for(int i = 0; i < population; i++)
             {
-                -1
-            };
-            Debug.Log("Empty");
-            return a;
+                for(int ii = 0; ii < population - 6; ii++){
+                    float b = transform.position.x * Random.Range(0.9f, 1.1f);
+                    int FirstInd = Random.Range(0, 5);
+                    GameObject offspring = SortedList[FirstInd];
+                    GameObject c = SortedList[Random.Range(FirstInd, 6)];
+                    //offspring.GetComponent<AI>().Conn = SortedList[FirstInd].GetComponent<AI>().Conn;
+                    //b.GetComponent<AI>().Conn.Add(6);
+
+                    //Random inheritance of weights
+                    if(offspring.GetComponent<AI>().innovations.Any()){
+                        if(c.GetComponent<AI>().innovations.Any()){
+                            for(int iii = 0; iii < offspring.GetComponent<AI>().innovations.Count; iii++){
+                                if(Random.Range(0, 2) == 0){
+                                        int tryFind = c.GetComponent<AI>().innovations.IndexOf(offspring.GetComponent<AI>().innovations[iii]);
+                                        if(tryFind != -1){
+                                            try{
+                                                offspring.GetComponent<AI>().weights[iii] = c.GetComponent<AI>().weights[tryFind];
+                                            }
+                                            catch{
+                                                Debug.Log(offspring.GetComponent<AI>().weights.Count + "  " + c.GetComponent<AI>().weights.Count + "  " + tryFind);
+                                            }
+                                        }
+                                }
+                            }
+                        }
+                    }
+                    if(Random.Range(0, 5) == 0){
+                        offspring.GetComponent<AI>().addition = 1;
+                    }
+                    else if(Random.Range(0, 5) == 0){
+                        offspring.GetComponent<AI>().addition = 2;
+                    }
+                    else{
+                        offspring.GetComponent<AI>().addition = 0;
+                    }
+                    //Reactivate and deactivate
+                    if(offspring.GetComponent<AI>().actConnect.Any()){
+                        if(Random.Range(0, 5) < 1){
+                            offspring.GetComponent<AI>().actConnect[Random.Range(0, offspring.GetComponent<AI>().actConnect.Count - 1)] = false;
+                            //offspring.GetComponent<AI>().actConnect.RemoveAt(Random.Range(0, offspring.GetComponent<AI>().actConnect.Count - 1));
+                        }
+                        else if(Random.Range(0, 5) < 1){
+                            List<int> check = new List<int>();
+                            for(int i = 0; i < offspring.GetComponent<AI>().actConnect.Count; i++){
+                                if(offspring.GetComponent<AI>().actConnect[i] == false){
+                                    check.Add(i);
+                                }
+                            }
+                            if(check.Any()){
+                                offspring.GetComponent<AI>().actConnect[check[Random.Range(0, check.Count)]] = true;
+                            }
+                        }
+                    }
+                    for(int ie = 0; ie < offspring.GetComponent<AI>().weights.Count; ie++){
+                        if(Random.Range(0, 5) < 4){
+                            offspring.GetComponent<AI>().weights[ie] = offspring.GetComponent<AI>().weights[ie] * Random.Range(-1.5f, 1.5f);
+                        }
+                    }
+                    NewAIs.Add(offspring);
+                    /*GameObject a = (GameObject) Instantiate(NewAIs[ii], new Vector3(b, transform.position.y, transform.position.z), Quaternion.identity);
+                    a.GetComponent<AI>().Adder();
+                    //a.name = "nn";*/
+                    var a = Instantiate(NewAIs[ii], new Vector3(b, transform.position.y, transform.position.z), Quaternion.identity);
+                    a.name = "nn";
+                    //Debug.Log("here");
+                }
+            }
+            Debug.Log(copyAI.Count);
+            foreach(var a in copyAI){
+                Destroy(a);
+            }
+            /*foreach(var f in AIs){
+                f.GetComponent<AI>().enabled = true;
+            }*/
         }
-        return order1;
     }
-    public void makeOrder(){
-        List<int> a = GenToPh();
-        order = a;
-    }
-    public void Adder(){
-        adjList.Clear();
-        for(int i = 0; i < neurones.Count; i++){
-            adjList.Add(new Dictionary<int, float>());
-        }
-        /*adjList = new List<Dictionary<int, float>>
+    public int DealInnovations(int inoV, int outV, bool rnnV){
         {
-            new Dictionary<int, float>(),
-            new Dictionary<int, float>(),
-            new Dictionary<int, float>(),
-            new Dictionary<int, float>(),
-            new Dictionary<int, float>()
-        };*/
-        if(addition == 1){
-            AddLink();
+            for(int i = 0; i < iInn.Count; i++){
+                if(iInn[i] == inoV){
+                    if(oInn[i] == outV){
+                        if(RNN[i] == rnnV){
+                            return i;
+                        }
+                    } 
+                }
+            }
         }
-        if(addition == 2){
-            AddNode();
-        }
-        makeOrder();
-        addition = 0;
+        iInn.Add(inoV);
+        oInn.Add(outV);
+        RNN.Add(rnnV);
+        return iInn.Count - 1;
     }
 }
